@@ -13,7 +13,7 @@ import java.util.Date;
 @Slf4j
 public class JwtUtil {
 
-    @Value("${jwt.secret:myDefaultSecretKeyThatIsLongEnoughForHS256Algorithm}")
+    @Value("${jwt.secret:kflafljahgljkfhgksgkl-124124k124lljk}")
     private String SECRET;
 
     @Value("${jwt.expiration:3600000}")

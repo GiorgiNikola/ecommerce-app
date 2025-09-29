@@ -74,6 +74,16 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "User deactivated successfully"));
     }
 
+    @PutMapping("/admin/users/{userId}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Activate user", description = "Activate user account (ADMIN only)")
+    @ApiResponse(responseCode = "200", description = "User activated successfully")
+    public ResponseEntity<Map<String, String>> activateUser(
+            @Parameter(description = "User ID") @PathVariable Long userId) {
+        userService.activateUser(userId);
+        return ResponseEntity.ok(Map.of("message", "User activated successfully"));
+    }
+
     @GetMapping("/admin/reports/daily/{storeId}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get daily sales reports", description = "Get daily sales reports for a store (ADMIN only)")

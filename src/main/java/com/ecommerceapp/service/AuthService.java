@@ -4,6 +4,9 @@ import com.ecommerceapp.annotation.LogMethod;
 import com.ecommerceapp.dto.auth.UserLoginRequest;
 import com.ecommerceapp.dto.registration.UserRegisterRequest;
 import com.ecommerceapp.dto.registration.UserResponse;
+import com.ecommerceapp.exception.AuthException;
+import com.ecommerceapp.exception.BusinessException;
+import com.ecommerceapp.exception.ResourceNotFoundException;
 import com.ecommerceapp.model.Role;
 import com.ecommerceapp.model.User;
 import com.ecommerceapp.repository.UserRepository;
@@ -20,9 +23,9 @@ public class AuthService {
     private final JwtUtil jwtUtil;
 
     @LogMethod("User registration")
-    public UserResponse register(UserRegisterRequest request) { // CHANGED RETURN TYPE
+    public UserResponse register(UserRegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new BusinessException("Username already exists");
         }
 
         User user = new User();
@@ -31,7 +34,6 @@ public class AuthService {
         user.setRole(Role.USER);
         user = userRepository.save(user);
 
-        // RETURN USER RESPONSE
         UserResponse response = new UserResponse();
         response.setId(user.getId());
         response.setUsername(user.getUsername());
@@ -43,14 +45,14 @@ public class AuthService {
     @LogMethod("User login")
     public String login(UserLoginRequest request) {
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new AuthException("Invalid credentials");
         }
 
         if (!user.isActive()) {
-            throw new RuntimeException("User account is deactivated");
+            throw new AuthException("User account is deactivated");
         }
 
         return jwtUtil.generateToken(user.getUsername(), user.getRole().name());

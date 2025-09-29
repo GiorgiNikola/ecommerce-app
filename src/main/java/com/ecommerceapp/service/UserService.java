@@ -5,6 +5,8 @@ import com.ecommerceapp.dto.purchase.PurchaseRequest;
 import com.ecommerceapp.dto.purchase.PurchaseResponse;
 import com.ecommerceapp.dto.registration.UserResponse;
 import com.ecommerceapp.dto.report.DailySalesReportResponse;
+import com.ecommerceapp.exception.BusinessException;
+import com.ecommerceapp.exception.ResourceNotFoundException;
 import com.ecommerceapp.model.*;
 import com.ecommerceapp.repository.*;
 import com.ecommerceapp.security.JwtUtil;
@@ -22,7 +24,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
-    private final StoreRepository storeRepository; // ADDED THIS
+    private final StoreRepository storeRepository;
     private final StoreProductRepository storeProductRepository;
     private final UserPurchaseRepository userPurchaseRepository;
     private final DailySalesReportRepository dailySalesReportRepository;
@@ -33,13 +35,13 @@ public class UserService {
     public PurchaseResponse purchaseProduct(String token, PurchaseRequest request) {
         String username = jwtUtil.extractUsername(token.substring(7));
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         StoreProduct storeProduct = storeProductRepository.findById(request.getStoreProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
         if (storeProduct.getQuantity() < request.getQuantity()) {
-            throw new RuntimeException("Insufficient stock available");
+            throw new BusinessException("Insufficient stock available. Available: " + storeProduct.getQuantity());
         }
 
         // Update inventory
@@ -60,7 +62,7 @@ public class UserService {
     public List<PurchaseResponse> getUserPurchases(String token) {
         String username = jwtUtil.extractUsername(token.substring(7));
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return userPurchaseRepository.findByUserId(user.getId()).stream()
                 .map(this::toPurchaseResponse)
@@ -77,14 +79,14 @@ public class UserService {
     @LogMethod("Get user by ID")
     public UserResponse getUserById(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return toUserResponse(user);
     }
 
     @LogMethod("Get user purchases by ID")
     public List<PurchaseResponse> getUserPurchases(Long userId) {
         if (!userRepository.existsById(userId)) {
-            throw new RuntimeException("User not found");
+            throw new ResourceNotFoundException("User not found");
         }
         return userPurchaseRepository.findByUserId(userId).stream()
                 .map(this::toPurchaseResponse)
@@ -94,7 +96,7 @@ public class UserService {
     @LogMethod("Deactivate user")
     public void deactivateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setActive(false);
         userRepository.save(user);
     }
@@ -102,20 +104,22 @@ public class UserService {
     @LogMethod("Activate user")
     public void activateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setActive(true);
         userRepository.save(user);
     }
 
     @LogMethod("Get daily sales reports")
     public List<DailySalesReportResponse> getDailySalesReports(Long storeId) {
+        if (!storeRepository.existsById(storeId)) {
+            throw new ResourceNotFoundException("Store not found");
+        }
         return dailySalesReportRepository.findByStoreId(storeId).stream()
                 .map(this::toReportResponse)
                 .collect(Collectors.toList());
     }
 
-    // Scheduler for daily reports
-    @Scheduled(cron = "0 0 0 * * *") // Every day at midnight
+    @Scheduled(cron = "0 0 0 * * *")
     @LogMethod("Generate daily sales reports")
     @Transactional
     public void generateDailySalesReports() {
@@ -123,23 +127,19 @@ public class UserService {
         LocalDateTime startOfDay = yesterday.atStartOfDay();
         LocalDateTime endOfDay = yesterday.plusDays(1).atStartOfDay().minusSeconds(1);
 
-        // Get all stores
         List<Store> stores = storeRepository.findAll();
 
         for (Store store : stores) {
-            // Check if report already exists
             if (dailySalesReportRepository.findByStoreIdAndReportDate(store.getId(), yesterday).isPresent()) {
                 continue;
             }
 
-            // Calculate total sales for this store
             double totalSales = userPurchaseRepository.findAll().stream()
                     .filter(p -> p.getStoreProduct().getStore().getId().equals(store.getId()))
                     .filter(p -> !p.getPurchaseDate().isBefore(startOfDay) && !p.getPurchaseDate().isAfter(endOfDay))
                     .mapToDouble(p -> p.getQuantity() * p.getStoreProduct().getPrice())
                     .sum();
 
-            // Save report
             DailySalesReport report = new DailySalesReport();
             report.setStore(store);
             report.setReportDate(yesterday);

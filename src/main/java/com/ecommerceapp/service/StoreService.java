@@ -6,6 +6,8 @@ import com.ecommerceapp.dto.product.UpdateStoreProductRequest;
 import com.ecommerceapp.dto.store.StoreRequest;
 import com.ecommerceapp.dto.store.StoreProductResponse;
 import com.ecommerceapp.dto.store.StoreResponse;
+import com.ecommerceapp.exception.BusinessException;
+import com.ecommerceapp.exception.ResourceNotFoundException;
 import com.ecommerceapp.model.Product;
 import com.ecommerceapp.model.Store;
 import com.ecommerceapp.model.StoreProduct;
@@ -35,14 +37,14 @@ public class StoreService {
     @LogMethod("Get store by ID")
     public StoreResponse getStoreById(Long id) {
         Store store = storeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Store not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
         return toStoreResponse(store);
     }
 
     @LogMethod("Get store products")
     public List<StoreProductResponse> getStoreProducts(Long storeId) {
         if (!storeRepository.existsById(storeId)) {
-            throw new RuntimeException("Store not found");
+            throw new ResourceNotFoundException("Store not found");
         }
         return storeProductRepository.findByStoreId(storeId).stream()
                 .map(this::toStoreProductResponse)
@@ -52,7 +54,7 @@ public class StoreService {
     @LogMethod("Get store product")
     public StoreProductResponse getStoreProduct(Long storeId, Long productId) {
         StoreProduct storeProduct = storeProductRepository.findByStoreIdAndProductId(storeId, productId)
-                .orElseThrow(() -> new RuntimeException("Product not found in this store"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found in this store"));
         return toStoreProductResponse(storeProduct);
     }
 
@@ -68,7 +70,7 @@ public class StoreService {
     @LogMethod("Update store")
     public StoreResponse updateStore(Long id, StoreRequest request) {
         Store store = storeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Store not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
         store.setName(request.getName());
         store.setDescription(request.getDescription());
         store = storeRepository.save(store);
@@ -78,7 +80,7 @@ public class StoreService {
     @LogMethod("Delete store")
     public void deleteStore(Long id) {
         if (!storeRepository.existsById(id)) {
-            throw new RuntimeException("Store not found");
+            throw new ResourceNotFoundException("Store not found");
         }
         storeRepository.deleteById(id);
     }
@@ -86,9 +88,8 @@ public class StoreService {
     @LogMethod("Add product to store")
     public StoreProductResponse addProductToStore(Long storeId, AddProductRequest request) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new RuntimeException("Store not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
 
-        // Create product if it doesn't exist
         Product product = productRepository.findByName(request.getProductName())
                 .orElseGet(() -> {
                     Product newProduct = new Product();
@@ -97,9 +98,8 @@ public class StoreService {
                     return productRepository.save(newProduct);
                 });
 
-        // Check if product already exists in this store
         if (storeProductRepository.findByStoreIdAndProductId(storeId, product.getId()).isPresent()) {
-            throw new RuntimeException("Product already exists in this store");
+            throw new BusinessException("Product already exists in this store");
         }
 
         StoreProduct storeProduct = new StoreProduct();
@@ -115,7 +115,7 @@ public class StoreService {
     @LogMethod("Update store product")
     public StoreProductResponse updateStoreProduct(Long storeId, Long productId, UpdateStoreProductRequest request) {
         StoreProduct storeProduct = storeProductRepository.findByStoreIdAndProductId(storeId, productId)
-                .orElseThrow(() -> new RuntimeException("Product not found in this store"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found in this store"));
 
         storeProduct.setPrice(request.getPrice());
         storeProduct.setQuantity(storeProduct.getQuantity() + request.getQuantityToAdd());
@@ -127,7 +127,7 @@ public class StoreService {
     @LogMethod("Remove product from store")
     public void removeProductFromStore(Long storeId, Long productId) {
         StoreProduct storeProduct = storeProductRepository.findByStoreIdAndProductId(storeId, productId)
-                .orElseThrow(() -> new RuntimeException("Product not found in this store"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found in this store"));
         storeProductRepository.delete(storeProduct);
     }
 

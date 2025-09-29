@@ -39,9 +39,37 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
-        log.error("Runtime exception occurred: ", ex);
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<ErrorResponse> handleAuthException(AuthException ex) {
+        log.error("Authentication/Authorization error: ", ex);
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                ex.getMessage(),
+                HttpStatus.UNAUTHORIZED.value(),
+                LocalDateTime.now(),
+                null
+        );
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex) {
+        log.error("Resource not found: ", ex);
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                ex.getMessage(),
+                HttpStatus.NOT_FOUND.value(),
+                LocalDateTime.now(),
+                null
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {
+        log.error("Business logic error: ", ex);
 
         ErrorResponse errorResponse = new ErrorResponse(
                 ex.getMessage(),
@@ -53,9 +81,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
+    // Keep existing handlers for Spring Security and JWT
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException ex) {
-        log.error("Authentication failed: ", ex);
+        log.error("Spring Security authentication failed: ", ex);
 
         ErrorResponse errorResponse = new ErrorResponse(
                 "Authentication failed",
@@ -72,7 +101,7 @@ public class GlobalExceptionHandler {
         log.error("Access denied: ", ex);
 
         ErrorResponse errorResponse = new ErrorResponse(
-                "Access denied",
+                "Access denied - insufficient privileges",
                 HttpStatus.FORBIDDEN.value(),
                 LocalDateTime.now(),
                 null
